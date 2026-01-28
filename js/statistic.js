@@ -145,9 +145,7 @@ function selectLanguageForDate(date, preferredLanguage = null) {
 
 async function fetchAvailableDates() {
   try {
-    // 从 data 分支获取文件列表
-    const fileListUrl = DATA_CONFIG.getDataUrl('assets/file-list.txt');
-    const response = await fetch(fileListUrl);
+    const response = await fetch('assets/file-list.txt');
     if (!response.ok) {
       console.error('Error fetching file list:', response.status);
       return [];
@@ -286,9 +284,7 @@ async function loadPapersByDateRange(startDate, endDate) {
     
     for (const date of validDatesInRange) {
       const selectedLanguage = selectLanguageForDate(date);
-      // 从 data 分支获取数据文件
-      const dataUrl = DATA_CONFIG.getDataUrl(`data/${date}_AI_enhanced_${selectedLanguage}.jsonl`);
-      const response = await fetch(dataUrl);
+      const response = await fetch(`data/${date}_AI_enhanced_${selectedLanguage}.jsonl`);
       const text = await response.text();
       const dataPapers = parseJsonlData(text, date);
       
