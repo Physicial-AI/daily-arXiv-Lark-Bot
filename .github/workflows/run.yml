@@ -155,7 +155,64 @@ jobs:
         echo "更新文件列表... / Updating file list..."
         ls data/*.jsonl | sed 's|data/||' > assets/file-list.txt
         echo "文件列表更新完成 / File list updated"
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Filter and Push to Lark
+      if: steps.dedup_check.outputs.has_new_content == 'true'
+      id: lark_push
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+        MODEL_NAME: ${{ vars.MODEL_NAME }}
         
+        LARK_WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+        LARK_WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        
+        LARK_TABLE_APP_ID: ${{ secrets.LARK_TABLE_APP_ID }}
+        LARK_TABLE_APP_SECRET: ${{ secrets.LARK_TABLE_APP_SECRET }}
+        LARK_TABLE_BASE_URL: ${{ secrets.LARK_TABLE_BASE_URL }}
+      run: |
+        today=${{ steps.crawl_step.outputs.crawl_date }}
+        LANGUAGE="${{ vars.LANGUAGE }}"
+        
+        echo "筛选文章并推送至飞书... / Filtering papers and pushing to Lark..."
+        
+        # 检查AI增强文件是否存在 / Check if AI enhanced file exists
+        AI_ENHANCED_FILE="./data/${today}_AI_enhanced_${LANGUAGE}.jsonl"
+        
+        if [ ! -f "$AI_ENHANCED_FILE" ]; then
+            echo "错误：未找到AI增强文件 $AI_ENHANCED_FILE / Error: AI enhanced file not found"
+            echo "可用文件列表："
+            ls -la ./data/
+            exit 1
+        fi
+        
+        # 进入 lark_bot 目录并执行任务
+        cd lark_bot
+
+        export LARK_TABLE_APP_ID=${{ secrets.LARK_TABLE_APP_ID }}
+        export LARK_TABLE_APP_SECRET=${{ secrets.LARK_TABLE_APP_SECRET }}
+        export LARK_TABLE_BASE_URL=${{ secrets.LARK_TABLE_BASE_URL }}
+
+        # 执行筛选和推送
+        # Execute filtering and pushing
+        python3 task.py --jsonl_path ../${AI_ENHANCED_FILE}
+        
+        # 检查执行状态
+        LARK_EXIT_CODE=$?
+        if [ $LARK_EXIT_CODE -ne 0 ]; then
+            echo "筛选与推送失败，退出码: $LARK_EXIT_CODE / Filtering and pushing failed, exit code: $LARK_EXIT_CODE"
+            echo "push_success=false" >> $GITHUB_OUTPUT
+            exit 1
+        else
+            echo "✅ 筛选与推送已执行完成 / DONE"
+            echo "push_success=true" >> $GITHUB_OUTPUT
+        fi
+
     - name: Summary
       run: |
         if [ "${{ steps.dedup_check.outputs.has_new_content }}" = "true" ]; then
